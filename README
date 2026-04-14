@@ -1,0 +1,449 @@
+# ☁️ Laboratorio Cloud Computing 
+
+Laboratorio personal para aprender Cloud Computing desde cero, partiendo de conocimientos en WildFly/Java EE hacia un stack moderno de contenedores, orquestación y CI/CD.
+
+---
+
+## 📋 Tabla de Contenidos
+
+- [Arquitectura del Laboratorio](#arquitectura-del-laboratorio)
+- [Requisitos Previos](#requisitos-previos)
+- [Estructura del Repositorio](#estructura-del-repositorio)
+- [Fases del Laboratorio](#fases-del-laboratorio)
+  - [Fase 1 — Docker](#fase-1--docker)
+  - [Fase 2 — Kubernetes con k3s](#fase-2--kubernetes-con-k3s)
+  - [Fase 3 — CI/CD con GitHub Actions](#fase-3--cicd-con-github-actions)
+  - [Fase 4 — Despliegue en la Nube](#fase-4--despliegue-en-la-nube)
+- [Stack Tecnológico](#stack-tecnológico)
+- [Comandos de Referencia](#comandos-de-referencia)
+- [Certificaciones Recomendadas](#certificaciones-recomendadas)
+
+---
+
+## 🏗️ Arquitectura del Laboratorio
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  HOST FÍSICO (Windows)               │
+│                  RAM: 8 GB                           │
+│                                                     │
+│  ┌─────────────────────────┐  ┌──────────────────┐  │
+│  │   Ubuntu Server VM      │  │  Windows Server  │  │
+│  │   RAM: 4 GB             │  │  2022 VM         │  │
+│  │   CPU: 2 cores          │  │  (suspendida     │  │
+│  │   Disco: 20 GB          │  │   durante lab)   │  │
+│  │                         │  └──────────────────┘  │
+│  │  ┌─────────────────┐    │                        │
+│  │  │     Docker      │    │                        │
+│  │  │  ┌───────────┐  │    │                        │
+│  │  │  │  mi-app   │  │    │                        │
+│  │  │  │ :3000     │  │    │                        │
+│  │  │  └───────────┘  │    │                        │
+│  │  └─────────────────┘    │                        │
+│  │                         │                        │
+│  │  ┌─────────────────┐    │                        │
+│  │  │   k3s (K8s)     │    │  ← Fase 2             │
+│  │  └─────────────────┘    │                        │
+│  └─────────────────────────┘                        │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+                         │
+                         ▼
+          ┌──────────────────────────┐
+          │   GitHub Actions (CI/CD) │  ← Fase 3
+          └──────────────────────────┘
+                         │
+                         ▼
+          ┌──────────────────────────┐
+          │   Oracle Cloud (Free)    │  ← Fase 4
+          │   AWS Free Tier          │
+          └──────────────────────────┘
+```
+
+---
+
+## ✅ Requisitos Previos
+
+### Software necesario en el host (Windows)
+
+| Software | Versión | Uso |
+|---|---|---|
+| VirtualBox | 6.x o superior | Hipervisor para las VMs |
+| Ubuntu Server | 22.04 LTS | VM principal del laboratorio |
+
+### Configuración de la VM Ubuntu
+
+| Parámetro | Valor |
+|---|---|
+| RAM | 4096 MB |
+| CPU | 2 cores |
+| Disco | 20 GB mínimo |
+| Red | Adaptador puente (Bridged) |
+| Portapapeles | Bidireccional |
+
+### Paquetes instalados en Ubuntu
+
+```bash
+# Guest Additions (para portapapeles compartido)
+sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11
+
+# Docker
+sudo apt install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
+```
+
+---
+
+## 📁 Estructura del Repositorio
+
+```
+cloud-lab/
+│
+├── README.md                  ← Este archivo
+│
+├── fase1-docker/
+│   └── mi-app/
+│       ├── app.js             ← App Node.js de prueba
+│       └── Dockerfile         ← Imagen del contenedor
+│
+├── fase2-kubernetes/
+│   ├── deployment.yaml        ← Definición del Deployment
+│   └── service.yaml           ← Exposición del servicio
+│
+├── fase3-cicd/
+│   └── .github/
+│       └── workflows/
+│           └── deploy.yml     ← Pipeline de GitHub Actions
+│
+└── fase4-cloud/
+    └── terraform/             ← Infraestructura como código (Oracle/AWS)
+```
+
+---
+
+## 🚀 Fases del Laboratorio
+
+---
+
+### Fase 1 — Docker
+**Estado: ✅ COMPLETADA**
+**Duración estimada:** 2-3 semanas
+
+#### ¿Qué es Docker?
+Docker permite empaquetar una aplicación y todas sus dependencias en un **contenedor** — una unidad portátil que corre igual en cualquier entorno.
+
+#### Instalación de Docker
+
+```bash
+# Actualizar sistema
+sudo apt update && sudo apt upgrade -y
+
+# Instalar dependencias
+sudo apt install -y ca-certificates curl gnupg
+
+# Agregar repositorio oficial de Docker
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Instalar Docker
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
+
+# Usar Docker sin sudo
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+#### Verificar instalación
+
+```bash
+docker --version
+docker run hello-world
+# Resultado esperado: "Hello from Docker!"
+```
+
+#### Estructura de mi-app
+
+```javascript
+// app.js — servidor Node.js sencillo
+const http = require('http');
+http.createServer((req, res) => {
+  res.end('Hola desde Docker');
+}).listen(3000);
+```
+
+```dockerfile
+# Dockerfile
+FROM node:18
+WORKDIR /app
+COPY app.js .
+EXPOSE 3000
+CMD ["node", "app.js"]
+```
+
+#### Construir y ejecutar la app
+
+```bash
+# Construir imagen
+docker build -t mi-app mi-app/
+
+# Ejecutar contenedor
+docker run -d -p 3000:3000 --name mi-app mi-app
+
+# Verificar que funciona
+curl http://localhost:3000
+# Resultado esperado: "Hola desde Docker"
+```
+
+#### Comandos Docker esenciales
+
+```bash
+docker ps                  # Ver contenedores corriendo
+docker logs mi-app         # Ver logs de la app
+docker stop mi-app         # Detener contenedor
+docker start mi-app        # Reiniciar contenedor
+docker rm mi-app           # Eliminar contenedor
+docker images              # Ver imágenes descargadas
+docker rmi mi-app          # Eliminar imagen
+```
+
+#### Conceptos aprendidos
+
+- `docker build` → Empaquetar app en imagen
+- `docker run` → Lanzar contenedor desde imagen
+- `Dockerfile` → Molde para construir la imagen
+- `EXPOSE` + `-p` → Mapeo de puertos contenedor ↔ host
+- `docker ps / logs / stop` → Gestión del ciclo de vida
+
+---
+
+### Fase 2 — Kubernetes con k3s
+**Estado: 🔄 EN PROGRESO**
+**Duración estimada:** 3-4 semanas
+
+#### ¿Qué es Kubernetes?
+Kubernetes (K8s) es el estándar de la industria para **orquestar contenedores** en producción. Gestiona despliegues, escalado, balanceo de carga y recuperación automática.
+
+#### ¿Por qué k3s?
+k3s es una distribución de Kubernetes 100% compatible pero ligera, ideal para laboratorios con recursos limitados. Los comandos y conceptos son idénticos al K8s completo.
+
+| | Kubernetes completo | k3s |
+|---|---|---|
+| RAM mínima | ~2 GB solo para K8s | ~512 MB |
+| Instalación | Compleja | Un solo comando |
+| Compatibilidad | Estándar | 100% compatible |
+
+#### Instalación de k3s
+
+```bash
+curl -sfL https://get.k3s.io | sh -
+```
+
+#### Verificar instalación
+
+```bash
+sudo kubectl get nodes
+# Resultado esperado:
+# NAME            STATUS   ROLES    AGE   VERSION
+# ubuntu-server   Ready    master   1m    v1.28.x
+```
+
+#### Conceptos clave de Kubernetes
+
+| Concepto | Descripción |
+|---|---|
+| **Pod** | Unidad mínima — contiene uno o más contenedores |
+| **Deployment** | Gestiona réplicas y actualizaciones de Pods |
+| **Service** | Expone el Deployment a la red |
+| **Namespace** | Agrupación lógica de recursos |
+| **kubectl** | CLI para interactuar con el clúster |
+
+#### Desplegar mi-app en k3s (próximo paso)
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mi-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mi-app
+  template:
+    metadata:
+      labels:
+        app: mi-app
+    spec:
+      containers:
+      - name: mi-app
+        image: mi-app:latest
+        ports:
+        - containerPort: 3000
+```
+
+```bash
+kubectl apply -f deployment.yaml
+kubectl get pods
+kubectl get deployments
+```
+
+---
+
+### Fase 3 — CI/CD con GitHub Actions
+**Estado: ⏳ PENDIENTE**
+**Duración estimada:** 2 semanas
+
+#### ¿Qué es CI/CD?
+- **CI** (Continuous Integration): Cada push al repositorio dispara automáticamente build y tests
+- **CD** (Continuous Deployment): Si todo pasa, despliega automáticamente a producción
+
+#### Pipeline planeado
+
+```
+Push a GitHub
+     │
+     ▼
+GitHub Actions
+     │
+     ├── Build imagen Docker
+     ├── Ejecutar tests
+     ├── Push imagen a Docker Hub / GHCR
+     └── Deploy a Kubernetes (Oracle Cloud)
+```
+
+#### Workflow de ejemplo (próximamente)
+
+```yaml
+# .github/workflows/deploy.yml
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [main]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Docker image
+        run: docker build -t mi-app .
+      - name: Deploy to K8s
+        run: kubectl apply -f deployment.yaml
+```
+
+---
+
+### Fase 4 — Despliegue en la Nube
+**Estado: ⏳ PENDIENTE**
+
+#### Plataformas gratuitas a usar
+
+| Plataforma | Free Tier | Uso en el lab |
+|---|---|---|
+| **Oracle Cloud** | 2 VMs ARM, 4 CPU, 24 GB RAM — siempre gratis | Lab principal en la nube |
+| **AWS** | EC2 t2.micro 750h/mes | Aprender el ecosistema más demandado |
+
+#### Pasos planeados
+
+1. Crear cuenta en Oracle Cloud Free Tier
+2. Provisionar VM con Terraform
+3. Instalar k3s en la VM cloud
+4. Configurar GitHub Actions para deploy automático a Oracle Cloud
+
+---
+
+## 🛠️ Stack Tecnológico
+
+```
+Nivel 1 — Contenedores
+├── Docker
+└── Docker Compose
+
+Nivel 2 — Orquestación
+├── Kubernetes (k3s en lab, EKS/GKE en cloud)
+└── kubectl
+
+Nivel 3 — CI/CD
+├── GitHub Actions
+└── Jenkins (entornos Java/JEE empresariales)
+
+Nivel 4 — Infraestructura como código
+├── Terraform
+└── Ansible
+```
+
+---
+
+## 📚 Comandos de Referencia Rápida
+
+### Docker
+
+```bash
+docker build -t <nombre> <ruta>          # Construir imagen
+docker run -d -p <host>:<cont> <imagen>  # Correr contenedor
+docker ps                                # Listar contenedores activos
+docker ps -a                             # Listar todos los contenedores
+docker logs <nombre>                     # Ver logs
+docker stop <nombre>                     # Detener
+docker rm <nombre>                       # Eliminar contenedor
+docker images                            # Listar imágenes
+docker rmi <imagen>                      # Eliminar imagen
+docker exec -it <nombre> bash            # Entrar al contenedor
+```
+
+### Kubernetes (kubectl)
+
+```bash
+kubectl get nodes                        # Ver nodos del clúster
+kubectl get pods                         # Ver pods
+kubectl get deployments                  # Ver deployments
+kubectl get services                     # Ver servicios
+kubectl apply -f <archivo.yaml>          # Aplicar configuración
+kubectl delete -f <archivo.yaml>         # Eliminar recursos
+kubectl logs <pod>                       # Ver logs de un pod
+kubectl describe pod <pod>               # Detalle de un pod
+kubectl exec -it <pod> -- bash           # Entrar al pod
+```
+
+---
+
+## 📜 Certificaciones Recomendadas
+
+| Certificación | Nivel | Costo aprox. | Prioridad |
+|---|---|---|---|
+| AWS Cloud Practitioner | Entrada | ~$100 | ⭐⭐⭐ Alta |
+| Google Cloud Digital Leader | Entrada | ~$99 | ⭐⭐ Media |
+| Kubernetes CKAD | Intermedio | ~$395 | ⭐⭐⭐ Alta |
+| Terraform Associate | Intermedio | ~$70 | ⭐⭐ Media |
+
+---
+
+## 📅 Progreso
+
+| Fase | Tarea | Estado |
+|---|---|---|
+| 1 | Configurar Ubuntu VM | ✅ Completado |
+| 1 | Instalar Docker | ✅ Completado |
+| 1 | Primer contenedor (hello-world) | ✅ Completado |
+| 1 | Contenerizar mi-app (Node.js) | ✅ Completado |
+| 1 | Comandos Docker esenciales | ✅ Completado |
+| 2 | Instalar k3s | 🔄 En progreso |
+| 2 | Desplegar mi-app en k3s | ⏳ Pendiente |
+| 2 | Escalar y gestionar pods | ⏳ Pendiente |
+| 3 | Crear repo GitHub | ⏳ Pendiente |
+| 3 | Pipeline GitHub Actions | ⏳ Pendiente |
+| 4 | Crear cuenta Oracle Cloud | ⏳ Pendiente |
+| 4 | Provisionar con Terraform | ⏳ Pendiente |
+| 4 | Deploy en la nube | ⏳ Pendiente |
+
+---
