@@ -4,22 +4,6 @@ Laboratorio personal para aprender Cloud Computing desde cero, partiendo de cono
 
 ---
 
-##📋 Tabla de Contenidos##
-
-- [Arquitectura del Laboratorio](#arquitectura-del-laboratorio)
-- [Requisitos Previos](#requisitos-previos)
-- [Estructura del Repositorio](#estructura-del-repositorio)
-- [Fases del Laboratorio](#fases-del-laboratorio)
-  - [Fase 1 — Docker](#fase-1--docker)
-  - [Fase 2 — Kubernetes con k3s](#fase-2--kubernetes-con-k3s)
-  - [Fase 3 — CI/CD con GitHub Actions](#fase-3--cicd-con-github-actions)
-  - [Fase 4 — Despliegue en la Nube](#fase-4--despliegue-en-la-nube)
-- [Stack Tecnológico](#stack-tecnológico)
-- [Comandos de Referencia](#comandos-de-referencia)
-- [Certificaciones Recomendadas](#certificaciones-recomendadas)
-
----
-
 ## 🏗️ Arquitectura del Laboratorio
 
 ```
